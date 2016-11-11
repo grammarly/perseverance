@@ -38,7 +38,7 @@
           delay (strategy attempt)]
       (when-not delay ; Strategy said we should stop retrying.
         (throw wrapped-ex))
-      (log-fn wrapped-ex delay)
+      (log-fn wrapped-ex attempt delay)
       (Thread/sleep delay)
       error-token)))
 
@@ -90,15 +90,29 @@
 
 (defn- default-log-fn
   "Prints a message to stdout that an error happened and going to be retried."
-  [wrapped-ex delay]
+  [wrapped-ex attempt delay]
   (println (format "%s, retrying in %.1f seconds..."
                    (:e (ex-data wrapped-ex))
                    (/ delay 1000.0))))
 
 (defmacro retry
+  "Wraps `body` in a context that will cause all matching `retriable` blocks to
+  retry when an error happens.
+
+  - `strategy` specifies how long to wait between retries (see
+  `constant-retry-strategy` and `progressive-retry-strategy`). By default, the
+  default progressive strategy is used.
+
+  - `selector` defines whether this retry context catches a particular failure.
+  Selector can either be a keyword (then it is matched against a tag provided by
+  `retriable`) or a predicate on a wrapped exception.
+
+  - `log-fn` is a function of the wrapped exception, attempt, and delay. It is
+  called every time the retry happens. The default `log-fn` prints the message
+  to standard output."
   [{:keys [strategy selector log-fn]} & body]
   `(binding [*retry-contexts*
-             (cons {:strategy ~(or strategy (progressive-retry-strategy))
+             (cons {:strategy ~(or strategy `(progressive-retry-strategy))
                     :strategies-map (atom {})
                     :selector ~(if (keyword? selector)
                                  `(fn [ex#] (= (:tag (ex-data ex#)) ~selector))
