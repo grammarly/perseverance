@@ -1,0 +1,209 @@
+* Perseverance
+
+  Perseverance is a flexible retried operations library inspired by Common
+  Lisp's condition system. It decouples the logic of marking something as
+  retriable from the decision of how it should be retried.
+
+** Why?
+
+   There already exist Clojure libraries for retrying operations: [[https://github.com/liwp/again][again]],
+   [[https://github.com/joegallo/robert-bruce][robert-bruce]]. What they do differently is they require to specify the retry
+   strategy in the same place where something needs to be retried. This
+   immediacy constrains the developer because it requires them to make
+   high-level decisions in low-level code.
+
+   Should a function downloading a file automatically retry on failure? If it
+   doesn't, the higher-level code cannot choose to retry that particular failed
+   case. If it *does* automatically retry, how many attempts should it make?
+   What if higher-level code needs the error to fail fast, and then try
+   something else instead?
+
+   In many cases, the lower level code has enough knowledge *how* to do
+   something (i.e. retry an operation) but doesn't know *what* to do (retry or
+   not, with which delay). The high-level code knows *what* it wants, but
+   doesn't know *how* to achieve it. Perseverance bridges these levels by
+   separating the how's and what's in code.
+
+   The following code demonstrates a scenario where unreliable functions are
+   hardened with Perseverance:
+
+   #+BEGIN_SRC clojure
+(require '[perseverance.core :as p])
+
+;; Fake function that returns a list of files, but fails the first three times.
+(let [cnt (atom 0)]
+  (defn list-s3-files []
+    (when (< @cnt 3)
+      (swap! cnt inc)
+      (throw (RuntimeException. "Failed to connect to S3.")))
+    (range 10)))
+
+;; Fake function that imitates downloading a file with 50/50 probability.
+(defn download-one-file [x]
+  (if (> (rand) 0.5)
+    (println (format "File #%d downloaded." x))
+    (throw (java.io.IOException. "Failed to download a file."))))
+
+;; Let's wrap the previous function in retriable.
+(defn download-one-file-safe [x]
+  (p/retriable {} (download-one-file x)))
+
+;; Now to a function that downloads all files.
+(defn download-all-files []
+  (let [files (p/retriable {:catch [RuntimeException]
+                            :tag ::list-files}
+                           (list-s3-files))]
+    (mapv download-one-file-safe files)))
+
+;; Let's call it and see what happens.
+(download-all-files)
+;; Unhandled java.lang.RuntimeException: Failed to connect to S3.
+
+;; Bam! The exception still happened. This is because we haven't established
+;; the retry context.
+
+(p/retry {} (download-all-files))
+
+;; java.lang.RuntimeException: Failed to connect to S3., retrying in 0.5 seconds...
+;; java.lang.RuntimeException: Failed to connect to S3., retrying in 0.5 seconds...
+;; java.lang.RuntimeException: Failed to connect to S3., retrying in 0.5 seconds...
+;; java.io.IOException: Failed to download a file., retrying in 0.5 seconds...
+;; File #0 downloaded.
+;; File #1 downloaded.
+;; java.io.IOException: Failed to download a file., retrying in 0.5 seconds...
+;; File #2 downloaded.
+;; File #3 downloaded.
+;; java.io.IOException: Failed to download a file., retrying in 0.5 seconds...
+;; java.io.IOException: Failed to download a file., retrying in 0.5 seconds...
+;; File #4 downloaded.
+;; ...
+
+;; The call eventually succeeds!
+   #+END_SRC
+
+** Usage
+
+   Add this line to the list of your dependencies:
+
+   [[https://clojars.org/com.grammarly/perseverance][https://clojars.org/com.grammarly/perseverance/latest-version.svg]]
+
+   =perseverance.core= is the only namespace. It exposes two main macros:
+   =retriable= and =retry=. The former is used to mark a piece of code as
+   suitable for retrying. The arguments are =[options-map & body]=.
+
+   #+BEGIN_SRC clojure
+(retriable {:catch [RuntimeException]
+            :tag ::list-files
+            ;; :ex-wrapper #(ex-info "My wrapped exception". {:e %, :foo :bar})
+            }
+           (list-s3-files))
+   #+END_SRC
+
+   Options map supports the following keys (but all of them are optional):
+
+   - =:catch= --- should be a list of Exception classes that are going to be
+     catched by =retriable=. The default value is =[java.io.IOException]=.
+     Perseverance doesn't catch all exceptions intentionally to avoid retrying
+     the errors that aren't IO-related, which would circumvent the proper error
+     handling in your program. Yet you can always provide =:catch [Exception]=
+     if you are sure that any potential exception inside is retriable.
+   - =:tag= --- attaches a keyword tag to the exceptions caught, so that the
+     outer =retry= macro can more accurately specify what it wants to retry.
+   - =:ex-wrapper= --- function that is called on the originally caught
+     exception and should return a wrapped exception. This can be used for even
+     more specific control of how each retriable block should be retried. If
+     this option is present, =:tag= is ignored.
+
+   The =retry= macro has the same signature: =[options-map & body]=.
+
+   #+BEGIN_SRC clojure
+(retry {:strategy (constant-retry-strategy 100)
+        :selector ::list-files
+        ;; :selector #(and (instance? ExceptionInfo %)
+        ;;                 (= (:foo (ex-data %)) :bar))
+        }
+       (download-all-files))
+   #+END_SRC
+
+   The options-map can have these keys:
+
+   - =:strategy= --- specifies the delay between each attempt, and how many
+     attempts at most should be taken. See [[#strategies][Strategies]] for details.
+   - =:selector= --- can be either a keyword or a predicate function. If a
+     keyword, this =retry= block will control only the =retriable='s with the
+     same tag. If a function, it will be called on the wrapped exception from
+     =retriable=, and if that returns true, the retry will be performed. If
+     =:selector= is not specified, the =retry= block will handle any underlying
+     =retriable= error, no matter which tags they have.
+   - =:log-fn= --- function of =[wrapped-ex attempt delay]=, called every time a
+     retry is performed. By default, it prints the message to stdout, you can
+     override the function with custom logging (or just silence it with a NOP).
+
+   With the help of selectors you can nest =retry= blocks to specify different
+   retry strategies for different retriable cases:
+
+   #+BEGIN_SRC clojure
+(retry
+ {:strategy (constant-retry-strategy 500)} ;; Catches everything.
+ (retry
+  {:strategy (progressive-retry-strategy :initial-delay 2000, :max-delay 10000)
+   :selector ::list-files}
+  (download-all-files)))
+   #+END_SRC
+
+*** Strategies
+
+    Perseverance ships with two strategies (or, more specifically, strategy
+    constructors):
+
+    =constant-retry-strategy= takes a delay, and returns the same delay on each
+    attempt. If =max-count= is provided, the strategy starts returning =nil= after
+    the number of attempts reaches that number. Perseverance treats =nil= from a
+    strategy as a signal to stop retrying the operation.
+
+    =progressive-retry-strategy= is a fancy variation of exponential backoff
+    algorithm. It starts with =initial-delay= and returns it =stable-length=
+    times, then for each next attempt the delay is multiplied by =multiplier=,
+    but cannot reach more than =max-delay=. After =max-count= attempts (if
+    provided), the strategy starts returning =nil=. For example, for this
+    strategy:
+
+    #+BEGIN_SRC clojure
+(progressive-retry-strategy :initial-delay 1000, :stable-length 4, :multiplier 2,
+                            :max-delay 10000)
+    #+END_SRC
+
+    the delays will be:
+
+    : 1000, 1000, 1000, 1000, 2000, 4000, 8000, 10000, 10000, 10000...
+
+    You can write custom strategies too. A strategy is a function that takes the
+    attempt number and returns a delay in milliseconds (or =nil= if retry
+    shouldn't be made). Attempts start from =1=, not zero.
+
+** Takeaways
+
+   Like any stack-based error-handling mechanism, Perseverance is susceptible to
+   mistakes when used with multi-threaded, asynchronous, or lazy evaluated code.
+   Perseverance is developed on top of try/catch and Clojure's dynamic
+   variables; so, you should be especially careful that the code inside
+   =retriable= and =retry= doesn't escape the dynamic scope. Lately, some of the
+   concurrency primitives (i.e. =future= and core.async's =go= blocks) started
+   forwarding the dynamic bindings into their threads, but laziness still causes
+   problems.
+
+** License
+
+   © Copyright 2016 Grammarly, Inc.
+
+   Licensed under the Apache License, Version 2.0 (the "License"); you may not
+   use this file except in compliance with the License. You may obtain a copy of
+   the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+   WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+   License for the specific language governing permissions and limitations under
+   the License.
