@@ -7,21 +7,21 @@
 ** Why?
 
    There already exist Clojure libraries for retrying operations: [[https://github.com/liwp/again][again]],
-   [[https://github.com/joegallo/robert-bruce][robert-bruce]]. These libraries require you to specify the retry strategy in the
-   place where something needs to be retried. Such urgency results in
-   high-level decisions inside low-level code.
+   [[https://github.com/joegallo/robert-bruce][robert-bruce]]. These libraries require you to specify the retry strategy in
+   the same place where something needs to be retried. Such urgency results in
+   high-level decisions being made inside low-level code.
 
    Should a function downloading a file automatically retry on failure? If it
-   *doesn't*, the higher-level code cannot choose to retry that particular failed
-   case. If it *does* retry automatically, how many attempts should it make?
-   What if the higher-level code needs an error to fail fast and then try
-   something else instead?
+   *doesn't*, the higher-level code cannot choose to retry this particular
+   failed case. If it *does* retry automatically, how many attempts should it
+   make? What if the higher-level code needs the function to fail fast and then
+   try something else instead?
 
    In many cases, the lower-level code has enough knowledge of *how* to do
    something (i.e., retry an operation) but doesn't know *what* to do (retry or
    not, with which delay). The high-level code knows *what* it wants, but
    doesn't know *how* to achieve it. Perseverance bridges these levels by
-   separating the how's and what's in code.
+   separating the how's from what's.
 
    The following code demonstrates a scenario where unreliable functions are
    reinforced with Perseverance:
@@ -58,7 +58,7 @@
 (download-all-files)
 ;; Unhandled java.lang.RuntimeException: Failed to connect to S3.
 
-;; Bam! The exception still happened. This is because we haven't established
+;; Bam! The exception still happened. It's because we haven't established
 ;; the retry context.
 
 (p/retry {} (download-all-files))
@@ -127,7 +127,8 @@
    The options-map can have the following keys:
 
    - =:strategy= --- specifies the delay before each attempt and how many
-     attempts at most should be taken. See [[#strategies][Strategies]] for details.
+     attempts at most should be taken. If not specified, a progressive strategy
+     with default settings will be used. See [[#strategies][Strategies]] for details.
    - =:selector= --- can be either a keyword or a predicate function. If it's a
      keyword, this =retry= block will control only the =retriable='s with the
      same tag. If it's a function, it will be called on the wrapped exception from
@@ -180,16 +181,23 @@
     attempt number and returns a delay in milliseconds (or =nil= if retry
     shouldn't be made). Attempts start from =1=, not zero.
 
-** Takeaways
+** Drawbacks and considerations
 
    Like any stack-based error-handling mechanism, Perseverance is susceptible to
-   mistakes when used with multi-threaded, asynchronous, or lazily evaluated code.
-   Perseverance is developed on top of try/catch and Clojure's dynamic
+   mistakes when used with multi-threaded, asynchronous, or lazily evaluated
+   code. Perseverance is implemented on top of try/catch and Clojure's dynamic
    variables; so, you should be especially careful that the code inside
    =retriable= and =retry= doesn't escape the dynamic scope. Lately, some of the
    concurrency primitives (i.e., =future= and core.async's =go= blocks) started
    forwarding the dynamic bindings into their threads, but laziness still causes
    problems.
+
+   Taking away all the strategies and dynamic fanciness, Perseverance is just a
+   dumb retrier. This is OK for requests that don't impact the other side of the
+   communication, or if the actions are idempotent. But if you are making a call
+   that must succeed only once, or you have to be sure that the retries don't
+   make the outage in the system even worse, you might want to use a more
+   sophisticated fault tolerance mechanism.
 
 ** License
 
