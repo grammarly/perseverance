@@ -1,6 +1,6 @@
 (set-env!
  :repositories [["central" "http://repo1.maven.org/maven2"]
-                ["clojars" "https://repo.clojars.org/"]]
+                ["clojars" "https://clojars.org/repo"]]
  :dependencies '[;; Development
                  [boot/core "2.6.0" :scope "provided"]
                  [adzerk/boot-test "1.1.2" :scope "test"]]
@@ -12,8 +12,8 @@
  pom  {:project     'com.grammarly/perseverance
        :version     "0.1.0-SNAPSHOT"
        :description "Flexible retries library for Clojure."
-       :license     {:name "Apache License, Version 2.0"
-                     :url "http://www.apache.org/licenses/LICENSE-2.0"}
+       :license     {"Apache License, Version 2.0"
+                     "http://www.apache.org/licenses/LICENSE-2.0"}
        :url         "https://github.com/grammarly/perseverance"
        :scm         {:url "https://github.com/grammarly/perseverance"}})
 
@@ -24,3 +24,12 @@
   (set-env! :source-paths #(into % (get-env :test-paths)))
   (require 'adzerk.boot-test)
   (eval `(adzerk.boot-test/test)))
+
+(deftask deploy
+  "Build and deploy the library to Clojars."
+  []
+  (set-env! :resource-paths (get-env :source-paths))
+  (comp (test)
+        (pom)
+        (jar)
+        (push :repo "clojars")))
