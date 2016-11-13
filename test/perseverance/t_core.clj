@@ -45,8 +45,6 @@
         (cond (> data 100) :eof
               good? (do (swap! state update :data inc) data)
               :else (throw (SocketTimeoutException. "pshhhh-ft-ft")))))))
-(def d (make-dial-up))
-
 
 (deftest retriable-test
   (is (thrown-with-msg? SocketTimeoutException #"pshhhh"
