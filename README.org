@@ -1,4 +1,4 @@
-* Perseverance
+* Perseverance [[https://circleci.com/gh/grammarly/perseverance][https://circleci.com/gh/grammarly/perseverance.svg?style=svg]]
 
   Perseverance is a flexible retried operations library inspired by the Common
   Lisp's condition system. It decouples the logic of marking something as
