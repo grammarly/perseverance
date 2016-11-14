@@ -1,9 +1,8 @@
 (set-env!
  :repositories [["central" "http://repo1.maven.org/maven2"]
                 ["clojars" "https://clojars.org/repo"]]
- :dependencies '[;; Development
-                 [boot/core "2.6.0" :scope "provided"]
-                 [adzerk/boot-test "1.1.2" :scope "test"]]
+ :dependencies '[[org.clojure/clojure "1.8.0" :scope "provided"]
+                 [boot/core "2.6.0" :scope "provided"]]
  :source-paths #{"src/"}
  :test-paths #{"test/"}
  :target "target/")
@@ -21,15 +20,15 @@
 (deftask test
   "Run unit tests."
   []
-  (set-env! :source-paths #(into % (get-env :test-paths)))
+  (set-env! :dependencies #(conj % '[adzerk/boot-test "1.1.2" :scope "test"])
+            :source-paths #(into % (get-env :test-paths)))
   (require 'adzerk.boot-test)
-  (eval `(adzerk.boot-test/test)))
+  ((resolve 'adzerk.boot-test/test)))
 
 (deftask deploy
   "Build and deploy the library to Clojars."
   []
   (set-env! :resource-paths (get-env :source-paths))
-  (comp (test)
-        (pom)
+  (comp (pom)
         (jar)
         (push :repo "clojars")))
