@@ -39,11 +39,11 @@
     (fn []
       (let [{:keys [good? left data]} @state]
         (if (= left 0)
-          (swap! state #(-> % (update :good? not)
+          (swap! state #(-> % (update-in [:good?] not)
                             (assoc :left (inc (rand-int 5)))))
-          (swap! state update :left dec))
+          (swap! state update-in [:left] dec))
         (cond (> data 100) :eof
-              good? (do (swap! state update :data inc) data)
+              good? (do (swap! state update-in [:data] inc) data)
               :else (throw (SocketTimeoutException. "pshhhh-ft-ft")))))))
 
 (deftest retriable-test
@@ -151,10 +151,10 @@
     (let [state (atom {:caught-by-outer 0, :caught-by-inner 0})]
       (retry
        {:strategy (constant-retry-strategy 0),
-        :log-fn (fn [& _] (swap! state update :caught-by-outer inc))}
+        :log-fn (fn [& _] (swap! state update-in [:caught-by-outer] inc))}
        (retry
         {:strategy (constant-retry-strategy 0),
-         :log-fn (fn [& _] (swap! state update :caught-by-inner inc))
+         :log-fn (fn [& _] (swap! state update-in [:caught-by-inner] inc))
          :selector (fn [ex] (instance? IOException (:e (ex-data ex))))}
         (download-all-files)
         (is (pos? (:caught-by-outer @state)))

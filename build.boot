@@ -1,7 +1,7 @@
 (set-env!
  :repositories [["central" "http://repo1.maven.org/maven2"]
                 ["clojars" "https://clojars.org/repo"]]
- :dependencies '[[org.clojure/clojure "1.8.0" :scope "provided"]
+ :dependencies '[[org.clojure/clojure "1.6.0" :scope "provided"]
                  [boot/core "2.6.0" :scope "provided"]]
  :source-paths #{"src/"}
  :test-paths #{"test/"}
@@ -19,9 +19,15 @@
 (ns-unmap 'boot.user 'test)
 (deftask test
   "Run unit tests."
-  []
-  (set-env! :dependencies #(conj % '[adzerk/boot-test "1.1.2" :scope "test"])
-            :source-paths #(into % (get-env :test-paths)))
+  [v clojure-version VERSION str "Clojure version to run tests with. Must match BOOT_CLOJURE_VERSION."]
+  (set-env! :source-paths #(into % (get-env :test-paths))
+            :dependencies
+            (fn [deps]
+              (->> deps
+                   (cons '[adzerk/boot-test "1.1.2" :scope "test"])
+                   ;; Replace Clojure version with the provided.
+                   (remove #(= (first %) 'org.clojure/clojure))
+                   (cons ['org.clojure/clojure (or clojure-version "1.6.0")]))))
   (require 'adzerk.boot-test)
   ((resolve 'adzerk.boot-test/test)))
 
