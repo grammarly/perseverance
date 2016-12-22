@@ -43,9 +43,20 @@
       error-token)))
 
 (defmacro retriable
-  "Wraps `body` in a loop that whenever SocketTimoutException is signaled,
-  `:retry-network` restart will be available to call `body` again. When
-  signaling a condition, attach `extras` to it."
+  "Signals to `retry` macro when exception is raised by the `body` so that it
+  can be retried.
+
+  `opts` can contain the following keys:
+
+  - `:catch` - list of exception classes that are handled. Defaults to
+  `[java.io.Exception]`.
+
+  - `:tag` - a tag to attach to the raised exception. Later `retry` can filter
+  by this tag which errors it wants to retry.
+
+  - `:ex-wrapper` - a function that is called on the originally raised exception
+  and returns a wrapped exception object. This can be used for even more
+  specific control by `retry`. If this option specified, `:tag` is ignored."
   [opts & body]
   (let [error-token (gensym "error-token")
         attempt (gensym "attempt")]
