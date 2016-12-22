@@ -9,7 +9,7 @@
 
 (task-options!
  pom  {:project     'com.grammarly/perseverance
-       :version     "0.1.0"
+       :version     "0.1.1"
        :description "Flexible retries library for Clojure."
        :license     {"Apache License, Version 2.0"
                      "http://www.apache.org/licenses/LICENSE-2.0"}
