@@ -2,7 +2,7 @@
  :repositories [["central" "http://repo1.maven.org/maven2"]
                 ["clojars" "https://clojars.org/repo"]]
  :dependencies '[[org.clojure/clojure "1.6.0" :scope "provided"]
-                 [boot/core "2.6.0" :scope "provided"]]
+                 [boot/core "2.7.0" :scope "provided"]]
  :source-paths #{"src/"}
  :test-paths #{"test/"}
  :target "target/")

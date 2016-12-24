@@ -51,7 +51,7 @@
 (defn download-all-files []
   (let [files (p/retriable {:catch [RuntimeException]
                             :tag ::list-files}
-                           (list-s3-files))]
+                (list-s3-files))]
     (mapv download-one-file-safe files)))
 
 ;; Let's call it and see what happens.
@@ -95,7 +95,7 @@
             :tag ::list-files
             ;; :ex-wrapper #(ex-info "My wrapped exception". {:e %, :foo :bar})
             }
-           (list-s3-files))
+  (list-s3-files))
    #+END_SRC
 
    Options map supports the following keys (all of them are optional):
@@ -121,7 +121,7 @@
         ;; :selector #(and (instance? ExceptionInfo %)
         ;;                 (= (:foo (ex-data %)) :bar))
         }
-       (download-all-files))
+  (download-all-files))
    #+END_SRC
 
    The options-map can have the following keys:
@@ -143,12 +143,10 @@
    retry strategies for different retriable cases:
 
    #+BEGIN_SRC clojure
-(retry
- {:strategy (constant-retry-strategy 500)} ;; Catches everything.
- (retry
-  {:strategy (progressive-retry-strategy :initial-delay 2000, :max-delay 10000)
-   :selector ::list-files}
-  (download-all-files)))
+(retry {:strategy (constant-retry-strategy 500)} ;; Catches everything.
+  (retry {:strategy (progressive-retry-strategy :initial-delay 2000, :max-delay 10000)
+          :selector ::list-files}
+    (download-all-files)))
    #+END_SRC
 
 *** Strategies

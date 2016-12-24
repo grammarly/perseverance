@@ -57,6 +57,7 @@
   - `:ex-wrapper` - a function that is called on the originally raised exception
   and returns a wrapped exception object. This can be used for even more
   specific control by `retry`. If this option specified, `:tag` is ignored."
+  {:style/indent 1}
   [opts & body]
   (let [error-token (gensym "error-token")
         attempt (gensym "attempt")]
@@ -121,6 +122,7 @@
   - `log-fn` is a function of the wrapped exception, attempt, and delay. It is
   called every time the retry happens. The default `log-fn` prints the message
   to standard output."
+  {:style/indent 1}
   [{:keys [strategy selector log-fn]} & body]
   `(binding [*retry-contexts*
              (cons {:strategy ~(or strategy `(progressive-retry-strategy))

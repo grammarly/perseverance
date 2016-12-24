@@ -59,8 +59,8 @@
 (deftest retry-test
   (is (= [1 2 3 4 5 6 7 8 9 10]
          (retry {:strategy (constant-retry-strategy 0), :log-fn (fn [& _])}
-                (let [dial-up (make-dial-up)]
-                  (doall (repeatedly 10 #(retriable {} (dial-up)))))))
+           (let [dial-up (make-dial-up)]
+             (doall (repeatedly 10 #(retriable {} (dial-up)))))))
       "makes network robust")
 
   (testing "log-fn reports each failed attempt"
@@ -68,7 +68,7 @@
           log (atom [])]
       (retry {:strategy (constant-retry-strategy 0)
               :log-fn (fn [e a delay] (swap! log conj {:e e, :a a :delay delay}))}
-             (doall (repeatedly 10 #(retriable {} (dial-up)))))
+        (doall (repeatedly 10 #(retriable {} (dial-up)))))
       (is (every? (partial = 0) (map :delay @log)))
       (is (every? pos? (map :a @log)))
       (is (every? (partial instance? ExceptionInfo) (map :e @log)))))
@@ -76,16 +76,16 @@
   (let [dial-up (make-dial-up)
         before (System/currentTimeMillis)]
     (retry {:strategy (constant-retry-strategy 50), :log-fn (fn [& _])}
-           (doall (repeatedly 11 #(retriable {} (dial-up))))
-           (is (>= (System/currentTimeMillis) before)
-               "waits before retrying")))
+      (doall (repeatedly 11 #(retriable {} (dial-up))))
+      (is (>= (System/currentTimeMillis) before)
+          "waits before retrying")))
 
   (let [dial-up (make-dial-up)]
     (retry {:strategy (constant-retry-strategy 0), :log-fn (fn [& _])}
-           (is (= (range 1 101)
-                  (doall (take-while #(not= % :eof)
-                                     (repeatedly #(retriable {} (dial-up))))))
-               "will download all data in the end"))))
+      (is (= (range 1 101)
+             (doall (take-while #(not= % :eof)
+                                (repeatedly #(retriable {} (dial-up))))))
+          "will download all data in the end"))))
 
 (deftest complicated-test
   ;; Fake function that returns a list of files, but fails the first three times.
@@ -119,7 +119,7 @@
   (defn download-all-files []
     (let [files (retriable {:catch [RuntimeException]
                             :tag ::list-files}
-                           (list-s3-files))]
+                  (list-s3-files))]
       (mapv download-one-file-safe files)))
 
   ;; Calling without retry will fail.
@@ -129,33 +129,32 @@
   (is (thrown? IOException
                (retry {:strategy (constant-retry-strategy 0), :log-fn (fn [& _])
                        :selector ::list-files}
-                      (download-all-files)))
+                 (download-all-files)))
       "We covered only ::list-files, files downloading will fail.")
   (list-s3-files :reset)
 
   (is (= (range 10)
          (retry {:strategy (constant-retry-strategy 0), :log-fn (fn [& _])
                  :selector (fn [ex] (or (instance? RuntimeException (:e (ex-data ex)))
-                                       (instance? IOException (:e (ex-data ex)))))}
-                (download-all-files)))
+                                        (instance? IOException (:e (ex-data ex)))))}
+           (download-all-files)))
       "Successfully downloads all files.")
   (list-s3-files :reset)
 
   (is (= (range 10)
          (retry {:strategy (constant-retry-strategy 0), :log-fn (fn [& _])}
-                (download-all-files)))
+           (download-all-files)))
       "Not specifying a selector covers all retriable cases.")
   (list-s3-files :reset)
 
   (testing "multi-level retry contexts"
     (let [state (atom {:caught-by-outer 0, :caught-by-inner 0})]
       (retry
-       {:strategy (constant-retry-strategy 0),
-        :log-fn (fn [& _] (swap! state update-in [:caught-by-outer] inc))}
-       (retry
-        {:strategy (constant-retry-strategy 0),
-         :log-fn (fn [& _] (swap! state update-in [:caught-by-inner] inc))
-         :selector (fn [ex] (instance? IOException (:e (ex-data ex))))}
-        (download-all-files)
-        (is (pos? (:caught-by-outer @state)))
-        (is (pos? (:caught-by-inner @state))))))))
+          {:strategy (constant-retry-strategy 0),
+           :log-fn (fn [& _] (swap! state update-in [:caught-by-outer] inc))}
+        (retry {:strategy (constant-retry-strategy 0),
+                :log-fn (fn [& _] (swap! state update-in [:caught-by-inner] inc))
+                :selector (fn [ex] (instance? IOException (:e (ex-data ex))))}
+          (download-all-files)
+          (is (pos? (:caught-by-outer @state)))
+          (is (pos? (:caught-by-inner @state))))))))
