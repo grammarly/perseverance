@@ -18,21 +18,31 @@
            (map (constant-retry-strategy 10 5) (range 1 11))))))
 
 (deftest progressive-retry-strategy-test
-  (is (= [1 1 1 2 4 8 16 32 64 128]
-         (map (progressive-retry-strategy :initial-delay 1 :stable-length 3
-                                          :multiplier 2 :max-delay 1000)
-              (range 1 11))))
+  (testing "Performs a stable-length of retries with initial-delay before increasing"
+    (is (= [1 1 1 2 4 8 16 32 64 128]
+          (map (progressive-retry-strategy :initial-delay 1 :stable-length 3
+                                            :multiplier 2 :max-delay 1000)
+               (range 1 11)))))
 
-  (is (= [1 2 4 8 16 32 64 128 256 512]
-         (map (progressive-retry-strategy :initial-delay 1 :stable-length 1
-                                          :multiplier 2 :max-delay 100)
-              (range 1 11))))
-
-  (is (= [1 2 4 8 16 nil nil nil nil nil]
-         (map (progressive-retry-strategy :initial-delay 1 :stable-length 1
-                                          :multiplier 2 :max-delay 1000
-                                          :max-count 5)
-              (range 1 11)))))
+  (testing "Returns delays that increase by multiplier"
+    (is (= [1 2 4 8 16 32 64 128 256 512]
+          (map (progressive-retry-strategy :initial-delay 1 :stable-length 1
+                                            :multiplier 2 :max-delay 1000)
+               (range 1 11)))))
+      
+  (testing "Starts returning nils after max-count attempts"
+    (is (= [1 2 4 8 16 nil nil nil nil nil]
+          (map (progressive-retry-strategy :initial-delay 1 :stable-length 1
+                                            :multiplier 2 :max-delay 1000
+                                            :max-count 5)
+               (range 1 11)))))
+                
+  (testing "Starts increasing after max-delay has been reached"
+    (is (= [1 2 4 8 16 32 64 64 64 64]
+          (map (progressive-retry-strategy :initial-delay 1 :stable-length 1
+                                            :multiplier 2 :max-delay 64)
+               (range 1 11))))))
+      
 
 (defn make-dial-up []
   (let [state (atom {:good? true, :left 3, :data 1})]
