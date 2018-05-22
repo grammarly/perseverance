@@ -23,9 +23,14 @@
                                           :multiplier 2 :max-delay 1000)
               (range 1 11))))
 
-  (is (= [1 2 4 8 16 32 64 128 256 512]
+  (is (= [1 2 4 8 16 32 64 100 100 100]
          (map (progressive-retry-strategy :initial-delay 1 :stable-length 1
                                           :multiplier 2 :max-delay 100)
+              (range 1 11))))
+
+  (is (= [1 2 4 8 16 32 64 128 256 512]
+         (map (progressive-retry-strategy :initial-delay 1 :stable-length 1
+                                          :multiplier 2 :max-delay 1000)
               (range 1 11))))
 
   (is (= [1 2 4 8 16 nil nil nil nil nil]
