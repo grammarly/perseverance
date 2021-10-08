@@ -37,7 +37,13 @@
          (map (progressive-retry-strategy :initial-delay 1 :stable-length 1
                                           :multiplier 2 :max-delay 1000
                                           :max-count 5)
-              (range 1 11)))))
+              (range 1 11))))
+
+  (is (= [10 10 10 300 300 300 300 300 300 300]
+         (map (progressive-retry-strategy :initial-delay 10 :stable-length 3
+                                          :multiplier 30 :max-delay 300)
+              (range 1 11)))
+      "exceed range for ints"))
 
 (defn make-dial-up []
   (let [state (atom {:good? true, :left 3, :data 1})]
