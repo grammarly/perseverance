@@ -98,8 +98,8 @@
     (when-not (and max-count (> attempt max-count))
       (if (<= attempt stable-length)
         initial-delay
-        (min max-delay
-             (* initial-delay (int (Math/pow multiplier (- attempt stable-length)))))))))
+        (int (min max-delay
+                  (* initial-delay (Math/pow multiplier (- attempt stable-length)))))))))
 
 (defn- default-log-fn
   "Prints a message to stdout that an error happened and going to be retried."
