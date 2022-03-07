@@ -49,7 +49,7 @@
   `opts` can contain the following keys:
 
   - `:catch` - list of exception classes that are handled. Defaults to
-  `[java.io.Exception]`.
+  `[java.io.IOException]`.
 
   - `:tag` - a tag to attach to the raised exception. Later `retry` can filter
   by this tag which errors it wants to retry.
